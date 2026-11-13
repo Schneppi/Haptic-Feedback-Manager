@@ -2,7 +2,7 @@
 
 A small Xojo class that wraps AppKit's [`NSHapticFeedbackManager`](https://developer.apple.com/documentation/appkit/nshapticfeedbackmanager), so your macOS Xojo apps can play a physical "click" on a Force Touch trackpad, the same way macOS does when a shape snaps to a guide in Keynote or a window edge lines up with another one. People can feel that something happened without looking.
 
-Includes a demo app with buttons for each feedback pattern and a square you can drag that snaps to center guides.
+Includes a demo app with buttons for each feedback pattern, a balance slider that snaps to its center, and a square you can drag that snaps to center guides.
 
 ![Haptic Feedback Demo](Screenshots/demo.png)
 
@@ -59,6 +59,7 @@ Usually you want `PerformanceTimeDefault`, so the click happens exactly when the
 1. Open `Haptic Feedback Manager.xojo_project` in Xojo and click **Run**.
 2. Keep your finger on the trackpad:
    - Click **Generic**, **Alignment** or **Level Change** to play that pattern.
+   - Move the **Balance** slider (0 to 100). Near the center it snaps to 50 with an alignment click, and you feel a level-change click each time you cross 25, 50 or 75.
    - Drag the dark square toward the middle. When its center lines up with a guide, the guide lights up and you feel an alignment click.
 
 ### No feedback felt?
@@ -66,6 +67,49 @@ Usually you want `PerformanceTimeDefault`, so the click happens exactly when the
 - Haptics only work on a Force Touch trackpad. A mouse or an older trackpad has none.
 - Feedback is only felt while your finger touches the trackpad. With the buttons, the pattern plays when you release the click, so keep your finger resting on the trackpad.
 - Check that **Force Click and haptic feedback** is on in **System Settings > Trackpad > Point & Click**.
+
+### Example: a slider that snaps to its center
+
+A practical use is a slider for something like balance or color temperature. Within 3 of the center the value snaps to 50 and plays `PatternAlignment`, once, when it enters that zone. Crossing a 25% mark plays `PatternLevelChange`. See the `BalanceSlider.ValueChanged` event in `Window1`:
+
+```xojo
+Sub ValueChanged()
+  If mUpdatingSlider Then Return // ignore our own snap
+
+  Var newValue As Integer = Me.Value
+  Var playedAlignment As Boolean
+
+  Var inSnapZone As Boolean = Abs(newValue - 50) <= 3
+  If inSnapZone Then
+    If newValue <> 50 Then
+      newValue = 50
+      mUpdatingSlider = True
+      Me.Value = newValue
+      mUpdatingSlider = False
+    End If
+    If Not mSliderSnapped Then
+      PlayPattern(HapticFeedbackManager.PatternAlignment)
+      playedAlignment = True
+    End If
+  End If
+  mSliderSnapped = inSnapZone
+
+  If Not playedAlignment And newValue <> mLastSliderValue Then
+    For mark As Integer = 25 To 75 Step 25
+      If (mLastSliderValue < mark And newValue >= mark) Or (mLastSliderValue > mark And newValue <= mark) Then
+        PlayPattern(HapticFeedbackManager.PatternLevelChange)
+        Exit For mark
+      End If
+    Next
+  End If
+
+  mLastSliderValue = newValue
+End Sub
+```
+
+## License
+
+Released under the [MIT License](LICENSE).
 
 ## Credits
 

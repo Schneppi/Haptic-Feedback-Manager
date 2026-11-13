@@ -47,7 +47,7 @@ Begin DesktopWindow Window1
       TabIndex        =   0
       TabPanelIndex   =   0
       TabStop         =   True
-      Text            =   "Keep your finger on the Force Touch trackpad. Click a button to play a pattern, or drag the square and feel it snap to the center guides. Feel nothing? Use a Force Touch trackpad (a mouse has no haptics) and turn on Force Click and haptic feedback in System Settings > Trackpad > Point && Click."
+      Text            =   "Keep your finger on the Force Touch trackpad. Click a button to play a pattern, move the Balance slider past 25, 50 and 75, or drag the square onto the center guides. Feel nothing? Use a Force Touch trackpad (a mouse has no haptics) and turn on Force Click and haptic feedback in System Settings > Trackpad > Point && Click."
       TextAlignment   =   0
       TextColor       =   &c000000
       Tooltip         =   ""
@@ -157,7 +157,7 @@ Begin DesktopWindow Window1
       AllowTabs       =   False
       Backdrop        =   0
       Enabled         =   True
-      Height          =   300
+      Height          =   264
       Index           =   -2147483648
       Left            =   20
       LockBottom      =   True
@@ -166,14 +166,106 @@ Begin DesktopWindow Window1
       LockRight       =   True
       LockTop         =   True
       Scope           =   2
-      TabIndex        =   4
+      TabIndex        =   7
       TabPanelIndex   =   0
       TabStop         =   True
       Tooltip         =   ""
-      Top             =   130
+      Top             =   166
       Transparent     =   True
       Visible         =   True
       Width           =   560
+   End
+   Begin DesktopLabel BalanceLabel
+      AllowAutoDeactivate=   True
+      Bold            =   False
+      Enabled         =   True
+      FontName        =   "System"
+      FontSize        =   0.0
+      FontUnit        =   0
+      Height          =   20
+      Index           =   -2147483648
+      Italic          =   False
+      Left            =   20
+      LockBottom      =   False
+      LockedInPosition=   False
+      LockLeft        =   True
+      LockRight       =   False
+      LockTop         =   True
+      Multiline       =   False
+      Scope           =   2
+      Selectable      =   False
+      TabIndex        =   4
+      TabPanelIndex   =   0
+      TabStop         =   True
+      Text            =   "Balance:"
+      TextAlignment   =   0
+      TextColor       =   &c000000
+      Tooltip         =   ""
+      Top             =   128
+      Transparent     =   False
+      Underline       =   False
+      Visible         =   True
+      Width           =   64
+   End
+   Begin DesktopSlider BalanceSlider
+      AllowAutoDeactivate=   True
+      AllowLiveScrolling=   True
+      Enabled         =   True
+      Height          =   23
+      Index           =   -2147483648
+      Left            =   92
+      LineStep        =   1
+      LockBottom      =   False
+      LockedInPosition=   False
+      LockLeft        =   True
+      LockRight       =   True
+      LockTop         =   True
+      MaximumValue    =   100
+      MinimumValue    =   0
+      PageStep        =   25
+      Scope           =   2
+      TabIndex        =   5
+      TabPanelIndex   =   0
+      TabStop         =   True
+      TickMarkStyle   =   0
+      Tooltip         =   "Snaps to 50 near the center; level-change click at 25, 50 and 75"
+      Top             =   126
+      Transparent     =   False
+      Value           =   50
+      Visible         =   True
+      Width           =   428
+   End
+   Begin DesktopLabel BalanceValueLabel
+      AllowAutoDeactivate=   True
+      Bold            =   False
+      Enabled         =   True
+      FontName        =   "System"
+      FontSize        =   0.0
+      FontUnit        =   0
+      Height          =   20
+      Index           =   -2147483648
+      Italic          =   False
+      Left            =   528
+      LockBottom      =   False
+      LockedInPosition=   False
+      LockLeft        =   False
+      LockRight       =   True
+      LockTop         =   True
+      Multiline       =   False
+      Scope           =   2
+      Selectable      =   False
+      TabIndex        =   6
+      TabPanelIndex   =   0
+      TabStop         =   True
+      Text            =   "50"
+      TextAlignment   =   3
+      TextColor       =   &c000000
+      Tooltip         =   ""
+      Top             =   128
+      Transparent     =   False
+      Underline       =   False
+      Visible         =   True
+      Width           =   52
    End
 End
 #tag EndDesktopWindow
@@ -218,6 +310,18 @@ End
 	#tag EndProperty
 
 	#tag Property, Flags = &h21
+		Private mLastSliderValue As Integer = 50
+	#tag EndProperty
+
+	#tag Property, Flags = &h21
+		Private mSliderSnapped As Boolean = True
+	#tag EndProperty
+
+	#tag Property, Flags = &h21
+		Private mUpdatingSlider As Boolean
+	#tag EndProperty
+
+	#tag Property, Flags = &h21
 		Private mSnappedX As Boolean
 	#tag EndProperty
 
@@ -227,6 +331,12 @@ End
 
 
 	#tag Constant, Name = kBoxSize, Type = Double, Dynamic = False, Default = \"60", Scope = Private
+	#tag EndConstant
+
+	#tag Constant, Name = kSliderCenter, Type = Double, Dynamic = False, Default = \"50", Scope = Private
+	#tag EndConstant
+
+	#tag Constant, Name = kSliderSnapDistance, Type = Double, Dynamic = False, Default = \"3", Scope = Private
 	#tag EndConstant
 
 	#tag Constant, Name = kSnapDistance, Type = Double, Dynamic = False, Default = \"8", Scope = Private
@@ -253,6 +363,51 @@ End
 	#tag Event
 		Sub Pressed()
 		  PlayPattern(HapticFeedbackManager.PatternLevelChange, HapticFeedbackManager.PerformanceTimeNow)
+		End Sub
+	#tag EndEvent
+#tag EndEvents
+#tag Events BalanceSlider
+	#tag Event
+		Sub ValueChanged()
+		  // Ignore the ValueChanged we cause ourselves when snapping to the center.
+		  If mUpdatingSlider Then Return
+
+		  Var newValue As Integer = Me.Value
+		  Var playedAlignment As Boolean
+
+		  // 1. Snap to the center: inside the snap zone the value is pulled to 50.
+		  //    The alignment click plays only when the value enters the zone.
+		  Var inSnapZone As Boolean = Abs(newValue - kSliderCenter) <= kSliderSnapDistance
+		  If inSnapZone Then
+		    If newValue <> kSliderCenter Then
+		      newValue = kSliderCenter
+		      mUpdatingSlider = True
+		      Me.Value = newValue
+		      mUpdatingSlider = False
+		    End If
+
+		    If Not mSliderSnapped Then
+		      PlayPattern(HapticFeedbackManager.PatternAlignment, HapticFeedbackManager.PerformanceTimeDefault)
+		      playedAlignment = True
+		    End If
+		  End If
+		  mSliderSnapped = inSnapZone
+
+		  // 2. Level change click whenever the value crosses (or lands on) a 25% mark.
+		  //    Skipped if the alignment click already played for this change.
+		  If Not playedAlignment And newValue <> mLastSliderValue Then
+		    For mark As Integer = 25 To 75 Step 25
+		      Var crossedUp As Boolean = mLastSliderValue < mark And newValue >= mark
+		      Var crossedDown As Boolean = mLastSliderValue > mark And newValue <= mark
+		      If crossedUp Or crossedDown Then
+		        PlayPattern(HapticFeedbackManager.PatternLevelChange, HapticFeedbackManager.PerformanceTimeDefault)
+		        Exit For mark // one click per change is enough, even on a big jump
+		      End If
+		    Next
+		  End If
+
+		  mLastSliderValue = newValue
+		  BalanceValueLabel.Text = newValue.ToString
 		End Sub
 	#tag EndEvent
 #tag EndEvents
