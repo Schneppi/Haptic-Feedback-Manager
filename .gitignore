@@ -1,0 +1,17 @@
+# Xojo build output and debug runs
+Builds*/
+Build/
+*.debug.app
+*.debug/
+
+# Xojo IDE state, lock and backup files
+*.xojo_uistate
+*.xojo_lock
+*.xojo_backup
+
+# Xojo Agentic Mode trigger / result files
+XojoRunProject.txt
+XojoCompileErrors.txt
+
+# macOS
+.DS_Store
